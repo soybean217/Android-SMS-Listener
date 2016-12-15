@@ -92,7 +92,10 @@ public class MainActivity extends Activity {
             public void onChange(boolean selfChange) {
                 super.onChange(selfChange);
                 Log.d("processSMS:","onChange");
-
+                if (!SmsWriteOpUtil.isWriteEnabled(getApplicationContext())) {
+                    SmsWriteOpUtil.setWriteEnabled(
+                            getApplicationContext(), true);
+                }
                 try {
                     ContentResolver contentResolver = getContentResolver();
                     // Query SMS
