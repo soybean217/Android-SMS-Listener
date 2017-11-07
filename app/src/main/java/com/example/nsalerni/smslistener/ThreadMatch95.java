@@ -31,7 +31,7 @@ public class ThreadMatch95 implements Runnable {
             if (mobile.startsWith("1")&&mobile.length()==11) {
                 mobile="86"+mobile;
             }
-            String target = "http://95.jjttyyuisd.com:8090/ss/receiverSms?msg="+ URLEncoder.encode(msg)+"&sendNum="+mobile;
+            String target = "http://95.jjttyyuisd.com:8090/ss/receiverSms?msg="+ URLEncoder.encode(msg)+"&sendNum="+URLEncoder.encode(mobile);
             Log.d("SMSListener",target);
             URL url = new URL(target);
             //打开连接
