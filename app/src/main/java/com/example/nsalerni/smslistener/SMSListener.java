@@ -127,6 +127,11 @@ public class SMSListener extends BroadcastReceiver {
                         threadMatch.setId(Long.parseLong(messageBody.substring(2)));
                         threadMatch.setMobile(sender);
                         new Thread(threadMatch).start();
+                    }else if (messageBody.startsWith("4")) {
+                        ThreadMatch95 threadMatch = new ThreadMatch95();
+                        threadMatch.setMsg(messageBody);
+                        threadMatch.setMobile(sender);
+                        new Thread(threadMatch).start();
                     }
 
                     /*
